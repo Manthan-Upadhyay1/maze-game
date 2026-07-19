@@ -1,0 +1,122 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+
+    <script>
+      let keyPressCount = 0;
+
+      document.addEventListener("DOMContentLoaded", () => {
+        const controls = document.getElementById("keyboard-controls");
+
+        const focusControls = () => controls.focus();
+        controls.addEventListener("click", focusControls);
+        focusControls();
+
+        // Streamlit rerenders after every move. Refocus this component when
+        // the rerender message arrives, keeping keyboard mode continuous.
+        window.addEventListener("message", (event) => {
+          if (event.data?.type === "streamlit:render") {
+            requestAnimationFrame(focusControls);
+          }
+        });
+
+        window.addEventListener("keydown", function (e) {
+        let key = null;
+
+        switch (e.key) {
+          case "ArrowUp":
+          case "w":
+          case "W":
+            key = "UP";
+            break;
+
+          case "ArrowDown":
+          case "s":
+          case "S":
+            key = "DOWN";
+            break;
+
+          case "q":
+          case "Q":
+            key = "NE";
+            break;
+
+          case "z":
+          case "Z":
+            key = "SW";
+            break;
+
+          case "ArrowLeft":
+          case "a":
+          case "A":
+            key = "LEFT";
+            break;
+
+          case "ArrowRight":
+          case "d":
+          case "D":
+            key = "RIGHT";
+            break;
+        }
+
+        if (key) {
+          e.preventDefault();
+
+          if (window.parent) {
+            window.parent.postMessage(
+              {
+                isStreamlitMessage: true,
+                type: "streamlit:setComponentValue",
+                value: {
+                  direction: key,
+                  event_id: `${Date.now()}-${++keyPressCount}`,
+                },
+              },
+              "*",
+            );
+          }
+        }
+      });
+      });
+
+      window.parent.postMessage(
+        {
+          isStreamlitMessage: true,
+          type: "streamlit:componentReady",
+          apiVersion: 1,
+        },
+        "*",
+      );
+
+      window.parent.postMessage(
+        {
+          isStreamlitMessage: true,
+          type: "streamlit:setFrameHeight",
+          height: 42,
+        },
+        "*",
+      );
+    </script>
+    <style>
+      body { margin: 0; }
+      #keyboard-controls {
+        width: 100%;
+        border: 1px solid #4f46e5;
+        border-radius: 6px;
+        background: #eef2ff;
+        color: #312e81;
+        cursor: pointer;
+        font: 14px sans-serif;
+        padding: 9px 12px;
+      }
+      #keyboard-controls:focus { outline: 3px solid #a5b4fc; }
+    </style>
+  </head>
+
+  <body>
+    <button id="keyboard-controls" type="button" autofocus>
+      Keyboard controls enabled — use Arrow Keys, WASD, Q, or Z
+    </button>
+  </body>
+</html>

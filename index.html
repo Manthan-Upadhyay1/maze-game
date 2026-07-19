@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Spot the Conflict — Transaction Schedule Quiz</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap');
+
+:root{
+  --bg:#0B0F14;
+  --panel:#121922;
+  --panel-2:#0E141B;
+  --border:#1E2A35;
+  --t1:#45D6C4;
+  --t1-dim:#1E3D3A;
+  --t2:#F0A857;
+  --t2-dim:#3D2F1B;
+  --sys:#7C8B99;
+  --danger:#FF6B6B;
+  --danger-dim:#3A1D1F;
+  --good:#7ED9A0;
+  --good-dim:#1B3A26;
+  --text:#E8EEF3;
+  --muted:#8494A3;
+  --mono:'IBM Plex Mono', monospace;
+  --display:'Space Grotesk', sans-serif;
+  --body:'Inter', sans-serif;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:var(--body);}
+.app{max-width:920px;margin:0 auto;padding:28px 20px 48px;}
+
+.hdr{display:flex;flex-direction:column;gap:10px;margin-bottom:20px;}
+.hdr h1{font-family:var(--display);font-size:25px;font-weight:700;margin:0;letter-spacing:-0.01em;}
+.hdr .sub{color:var(--muted);font-size:13.5px;margin:0;max-width:620px;line-height:1.5;}
+
+.hud{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px;}
+.qcount{font-family:var(--mono);font-size:12px;color:var(--muted);}
+.score{font-family:var(--mono);font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px;}
+.score b{color:var(--good);font-size:14px;}
+.qdots{display:flex;gap:5px;}
+.qdot{width:8px;height:8px;border-radius:50%;background:var(--border);}
+.qdot.done-correct{background:var(--good);}
+.qdot.done-wrong{background:var(--danger);}
+.qdot.active{outline:2px solid var(--text);outline-offset:2px;}
+
+.timeline-panel{
+  background:var(--panel);border:1px solid var(--border);border-radius:12px;
+  padding:16px;margin-bottom:16px;
+}
+.timeline-title{font-family:var(--mono);font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:14px;display:flex;justify-content:space-between;}
+.timeline{display:flex;flex-direction:column;gap:9px;}
+
+.row{display:grid;grid-template-columns:1fr 28px 1fr;gap:10px;}
+.slot{border-radius:9px;padding:9px 12px;font-size:13px;line-height:1.4;border:1px solid transparent;visibility:hidden;}
+.slot.filled{visibility:visible;}
+.slot.t1{background:var(--t1-dim);border-color:#2b5c56;}
+.slot.t2{background:var(--t2-dim);border-color:#6b4c26;}
+.slot .op{font-family:var(--mono);font-weight:600;font-size:12.5px;}
+.slot.t1 .op{color:var(--t1);}
+.slot.t2 .op{color:var(--t2);}
+.slot .desc{color:var(--text);margin-top:3px;font-size:12.5px;}
+.slot .sql{font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:6px;white-space:pre-wrap;border-top:1px dashed rgba(255,255,255,0.08);padding-top:6px;}
+.row.flag .slot.filled{box-shadow:0 0 0 2px var(--danger);}
+
+.mid{display:flex;align-items:center;justify-content:center;}
+.mid .dot{width:9px;height:9px;border-radius:50%;background:var(--sys);}
+.sys-note{grid-column:1/-1;text-align:center;font-family:var(--mono);font-size:11.5px;color:var(--sys);background:var(--panel-2);border:1px dashed var(--border);border-radius:7px;padding:6px 10px;}
+
+.prompt{font-size:14px;color:var(--text);margin:4px 0 14px;font-weight:500;}
+
+.options{display:flex;flex-direction:column;gap:9px;margin-bottom:14px;}
+.opt{
+  text-align:left;font-family:var(--body);font-size:14px;font-weight:500;
+  padding:13px 16px;border-radius:10px;border:1px solid var(--border);
+  background:var(--panel);color:var(--text);cursor:pointer;transition:all .15s ease;
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+}
+.opt:hover:not(.locked){border-color:#3a4d5c;background:#182530;}
+.opt .name{display:flex;flex-direction:column;gap:2px;}
+.opt .tag{font-family:var(--mono);font-size:10.5px;color:var(--muted);}
+.opt .mark{font-size:16px;}
+.opt.selected{outline:2px solid var(--text);outline-offset:-2px;}
+.opt.correct{background:var(--good-dim);border-color:#2e6b45;}
+.opt.correct .tag{color:var(--good);}
+.opt.wrong{background:var(--danger-dim);border-color:#5a2a2a;}
+.opt.wrong .tag{color:var(--danger);}
+.opt.locked{cursor:default;}
+.opt.dim{opacity:.5;}
+
+.result-banner{
+  font-family:var(--body);font-size:14px;font-weight:600;padding:12px 14px;border-radius:9px;
+  margin-bottom:12px;display:none;
+}
+.result-banner.show{display:block;}
+.result-banner.correct{background:var(--good-dim);color:var(--good);border:1px solid #2e6b45;}
+.result-banner.wrong{background:var(--danger-dim);color:var(--danger);border:1px solid #5a2a2a;}
+
+.reveal{display:none;background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:16px;}
+.reveal.show{display:block;}
+.reveal .card-title{font-family:var(--mono);font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px;}
+.reveal .name-line{font-family:var(--display);font-size:18px;font-weight:700;margin-bottom:8px;}
+.reveal .explain{font-size:13.5px;line-height:1.6;color:var(--text);}
+.reveal .explain b{color:var(--danger);}
+
+.controls{display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
+.btn{font-family:var(--body);font-weight:500;font-size:13px;padding:9px 16px;border-radius:8px;border:1px solid var(--border);background:var(--panel);color:var(--text);cursor:pointer;transition:all .15s;}
+.btn:hover:not(:disabled){border-color:#3a4d5c;background:#182530;}
+.btn:disabled{opacity:.35;cursor:default;}
+.btn.primary{background:#1c3d38;border-color:#2b5c56;color:var(--t1);}
+.btn.primary:hover:not(:disabled){background:#204742;}
+
+.done-screen{text-align:center;padding:40px 20px;}
+.done-screen h2{font-family:var(--display);font-size:22px;margin-bottom:8px;}
+.done-screen .bigscore{font-family:var(--mono);font-size:40px;color:var(--good);margin:10px 0;}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="hdr">
+    <h1>Spot the conflict</h1>
+    <p class="sub">Read the interleaved schedule below, then decide what kind of conflict it shows. The name is revealed only after you answer.</p>
+  </div>
+
+  <div class="hud">
+    <div class="qcount" id="qcount"></div>
+    <div class="qdots" id="qdots"></div>
+    <div class="score">Score <b id="scoreVal">0</b>/<span id="scoreTotal">0</span></div>
+  </div>
+
+  <div class="timeline-panel">
+    <div class="timeline-title"><span>Schedule</span><span id="tlItem"></span></div>
+    <div class="timeline" id="timeline"></div>
+  </div>
+
+  <div class="prompt">Which conflict does this schedule show?</div>
+  <div class="options" id="options"></div>
+
+  <div class="result-banner" id="resultBanner"></div>
+
+  <div class="reveal" id="reveal">
+    <div class="card-title">Revealed</div>
+    <div class="name-line" id="revealName"></div>
+    <div class="explain" id="revealExplain"></div>
+  </div>
+
+  <div class="controls">
+    <button class="btn" id="retryBtn" style="display:none;">Try again</button>
+    <button class="btn primary" id="nextBtn" style="display:none;">Next schedule →</button>
+  </div>
+
+  <div id="doneScreen" class="done-screen" style="display:none;"></div>
+</div>
+
+<script>
+const TYPES = {
+  dirty: { label:'Dirty Read', tag:'Write → Read', short:'One transaction reads a value another transaction wrote but never committed.' },
+  lost: { label:'Lost Update', tag:'Write → Write', short:'Two transactions read the same value, then both write based on it — one write silently overwrites the other.' },
+  unrepeatable: { label:'Unrepeatable Read', tag:'Read → Write → Read', short:'The same transaction reads the same row twice and gets two different answers, because another transaction committed a change in between.' },
+};
+
+const QUESTIONS = [
+{
+  type:'dirty', item:'Accounts.Balance (Acc_No = 210)', initial:'₹8000',
+  steps:[
+    {tx:'t1', op:'BEGIN', desc:'T1 starts a transaction.', sql:'BEGIN;'},
+    {tx:'t1', op:'WRITE', desc:'T1 debits ₹2000 (not yet committed).', sql:'UPDATE Accounts SET Balance = Balance - 2000\nWHERE Acc_No = 210;', valueAfter:'₹6000'},
+    {tx:'t2', op:'BEGIN', desc:'T2 starts a transaction.', sql:'BEGIN;'},
+    {tx:'t2', op:'READ', desc:'T2 reads the balance.', sql:'SELECT Balance FROM Accounts\nWHERE Acc_No = 210;', flag:true},
+    {tx:'t1', op:'ROLLBACK', desc:'T1 aborts — the debit is undone.', sql:'ROLLBACK;', valueAfter:'₹8000'},
+    {tx:'sys', op:'RESULT', desc:'T2 already used the ₹6000 figure in its own logic.'},
+  ],
+  explain:'T2 read ₹6000 while T1\u2019s debit was still uncommitted. When T1 rolled back, that value was never real — T2 acted on data that officially never existed.'
+},
+{
+  type:'lost', item:'Flights.Seats_Available (Flight_No = \'6E118\')', initial:'2',
+  steps:[
+    {tx:'t1', op:'BEGIN', desc:'T1 starts a transaction to book 1 seat.', sql:'BEGIN;'},
+    {tx:'t1', op:'READ', desc:'T1 reads seats available.', sql:"SELECT Seats_Available FROM Flights\nWHERE Flight_No = '6E118';"},
+    {tx:'t2', op:'BEGIN', desc:'T2 starts a transaction to book 1 seat.', sql:'BEGIN;'},
+    {tx:'t2', op:'READ', desc:'T2 reads the same seat count.', sql:"SELECT Seats_Available FROM Flights\nWHERE Flight_No = '6E118';", flag:true},
+    {tx:'t1', op:'WRITE', desc:'T1 writes its computed value and commits.', sql:"UPDATE Flights SET Seats_Available = 1\nWHERE Flight_No = '6E118';\nCOMMIT;", valueAfter:'1'},
+    {tx:'t2', op:'WRITE', desc:'T2 writes its own computed value and commits.', sql:"UPDATE Flights SET Seats_Available = 1\nWHERE Flight_No = '6E118';\nCOMMIT;", valueAfter:'1', flag:true},
+  ],
+  explain:'Both T1 and T2 read Seats_Available = 2 before either wrote back, so both independently computed 1. T2\u2019s write overwrote T1\u2019s — two seats were sold but the count only dropped by one.'
+},
+{
+  type:'unrepeatable', item:'Products.Price (Product_ID = 77)', initial:'₹1200',
+  steps:[
+    {tx:'t1', op:'BEGIN', desc:'T1 starts a transaction generating an invoice.', sql:'BEGIN;'},
+    {tx:'t1', op:'READ', desc:'T1 reads the price.', sql:'SELECT Price FROM Products\nWHERE Product_ID = 77;'},
+    {tx:'t2', op:'BEGIN', desc:'T2 starts a transaction to update pricing.', sql:'BEGIN;'},
+    {tx:'t2', op:'WRITE', desc:'T2 updates the price and commits.', sql:'UPDATE Products SET Price = 1450\nWHERE Product_ID = 77;\nCOMMIT;', valueAfter:'₹1450'},
+    {tx:'t1', op:'READ', desc:'T1 re-reads the same row, still inside its transaction.', sql:'SELECT Price FROM Products\nWHERE Product_ID = 77;', flag:true},
+  ],
+  explain:'T1 ran the exact same query twice inside one transaction and got two different answers, ₹1200 then ₹1450, because T2 committed a change to that row in between.'
+},
+{
+  type:'dirty', item:'Library.Copies_Available (Book_ID = \'B-42\')', initial:'1',
+  steps:[
+    {tx:'t1', op:'BEGIN', desc:'T1 starts a transaction to reserve the last copy.', sql:'BEGIN;'},
+    {tx:'t1', op:'WRITE', desc:'T1 marks the copy reserved (uncommitted).', sql:"UPDATE Library SET Copies_Available = 0\nWHERE Book_ID = 'B-42';", valueAfter:'0'},
+    {tx:'t2', op:'BEGIN', desc:'T2 starts a transaction to check availability.', sql:'BEGIN;'},
+    {tx:'t2', op:'READ', desc:'T2 reads the copy count.', sql:"SELECT Copies_Available FROM Library\nWHERE Book_ID = 'B-42';", flag:true},
+    {tx:'t1', op:'ROLLBACK', desc:'T1 aborts — the patron cancelled the reservation request.', sql:'ROLLBACK;', valueAfter:'1'},
+    {tx:'sys', op:'RESULT', desc:'T2 already told a librarian "0 copies available", based on a value that was undone.'},
+  ],
+  explain:'T2 read Copies_Available = 0 while T1\u2019s reservation write was still uncommitted. T1 then rolled back, restoring the true value of 1 — but T2 had already used the never-committed 0.'
+},
+{
+  type:'lost', item:'Warehouse.Stock_Qty (SKU = \'WH-990\')', initial:'50',
+  steps:[
+    {tx:'t1', op:'BEGIN', desc:'T1 starts a transaction to fulfill an order of 10 units.', sql:'BEGIN;'},
+    {tx:'t1', op:'READ', desc:'T1 reads current stock.', sql:"SELECT Stock_Qty FROM Warehouse\nWHERE SKU = 'WH-990';"},
+    {tx:'t2', op:'BEGIN', desc:'T2 starts a transaction to fulfill a different order of 10 units.', sql:'BEGIN;'},
+    {tx:'t2', op:'READ', desc:'T2 reads the same stock value.', sql:"SELECT Stock_Qty FROM Warehouse\nWHERE SKU = 'WH-990';", flag:true},
+    {tx:'t1', op:'WRITE', desc:'T1 writes its computed value and commits.', sql:"UPDATE Warehouse SET Stock_Qty = 40\nWHERE SKU = 'WH-990';\nCOMMIT;", valueAfter:'40'},
+    {tx:'t2', op:'WRITE', desc:'T2 writes its own computed value and commits.', sql:"UPDATE Warehouse SET Stock_Qty = 40\nWHERE SKU = 'WH-990';\nCOMMIT;", valueAfter:'40', flag:true},
+  ],
+  explain:'Both transactions read Stock_Qty = 50 before either committed, so both computed 40. T2\u2019s write overwrote T1\u2019s — 20 units were shipped out but stock only dropped by 10.'
+},
+{
+  type:'unrepeatable', item:'Students.GPA (Student_ID = 3311)', initial:'8.2',
+  steps:[
+    {tx:'t1', op:'BEGIN', desc:'T1 starts a transaction generating a transcript.', sql:'BEGIN;'},
+    {tx:'t1', op:'READ', desc:'T1 reads the GPA.', sql:'SELECT GPA FROM Students\nWHERE Student_ID = 3311;'},
+    {tx:'t2', op:'BEGIN', desc:'T2 starts a transaction after a grade correction.', sql:'BEGIN;'},
+    {tx:'t2', op:'WRITE', desc:'T2 updates the GPA and commits.', sql:'UPDATE Students SET GPA = 8.6\nWHERE Student_ID = 3311;\nCOMMIT;', valueAfter:'8.6'},
+    {tx:'t1', op:'READ', desc:'T1 re-reads the same row for a final consistency check.', sql:'SELECT GPA FROM Students\nWHERE Student_ID = 3311;', flag:true},
+  ],
+  explain:'T1 queried the same row twice within one transaction and got 8.2 then 8.6, because T2 committed a grade correction in between the two reads.'
+},
+];
+
+let qIdx = 0;
+let answered = false;
+let selectedKey = null;
+let results = []; // 'correct' | 'wrong' | null per question
+
+const el = {
+  qcount: document.getElementById('qcount'),
+  qdots: document.getElementById('qdots'),
+  scoreVal: document.getElementById('scoreVal'),
+  scoreTotal: document.getElementById('scoreTotal'),
+  tlItem: document.getElementById('tlItem'),
+  timeline: document.getElementById('timeline'),
+  options: document.getElementById('options'),
+  resultBanner: document.getElementById('resultBanner'),
+  reveal: document.getElementById('reveal'),
+  revealName: document.getElementById('revealName'),
+  revealExplain: document.getElementById('revealExplain'),
+  retryBtn: document.getElementById('retryBtn'),
+  nextBtn: document.getElementById('nextBtn'),
+  doneScreen: document.getElementById('doneScreen'),
+  app: document.querySelector('.app'),
+};
+
+function currentValue(q, upToIdx){
+  let v = q.initial;
+  for(let i=0;i<=upToIdx;i++){ if(q.steps[i].valueAfter !== undefined) v = q.steps[i].valueAfter; }
+  return v;
+}
+
+function renderDots(){
+  el.qdots.innerHTML = '';
+  QUESTIONS.forEach((_, i) => {
+    const d = document.createElement('div');
+    let cls = 'qdot';
+    if(results[i] === 'correct') cls += ' done-correct';
+    else if(results[i] === 'wrong') cls += ' done-wrong';
+    if(i === qIdx) cls += ' active';
+    d.className = cls;
+    el.qdots.appendChild(d);
+  });
+}
+
+function renderQuestion(){
+  answered = false;
+  selectedKey = null;
+  const q = QUESTIONS[qIdx];
+
+  el.qcount.textContent = `Schedule ${qIdx+1} of ${QUESTIONS.length}`;
+  el.tlItem.textContent = q.item;
+  renderDots();
+
+  el.timeline.innerHTML = '';
+  q.steps.forEach(step => {
+    const row = document.createElement('div');
+    row.className = 'row';
+    if(step.tx === 'sys'){
+      const note = document.createElement('div');
+      note.className = 'sys-note';
+      note.textContent = step.desc;
+      row.appendChild(note);
+      el.timeline.appendChild(row);
+      return;
+    }
+    const left = document.createElement('div');
+    left.className = 'slot' + (step.tx === 't1' ? ' t1 filled' : '');
+    const mid = document.createElement('div');
+    mid.className = 'mid';
+    mid.innerHTML = '<div class="dot"></div>';
+    const right = document.createElement('div');
+    right.className = 'slot' + (step.tx === 't2' ? ' t2 filled' : '');
+    const content = `<div class="op">${step.op}</div><div class="desc">${step.desc}</div><div class="sql">${step.sql}</div>`;
+    if(step.tx === 't1') left.innerHTML = content;
+    if(step.tx === 't2') right.innerHTML = content;
+    row.appendChild(left); row.appendChild(mid); row.appendChild(right);
+    row.dataset.flag = step.flag ? '1' : '0';
+    el.timeline.appendChild(row);
+  });
+
+  // options
+  el.options.innerHTML = '';
+  Object.entries(TYPES).forEach(([key, t]) => {
+    const b = document.createElement('button');
+    b.className = 'opt';
+    b.innerHTML = `<div class="name"><div>${t.label}</div><div class="tag">${t.tag}</div></div><div class="mark"></div>`;
+    b.onclick = () => selectAnswer(key);
+    el.options.appendChild(b);
+  });
+
+  el.resultBanner.className = 'result-banner';
+  el.resultBanner.textContent = '';
+  el.reveal.className = 'reveal';
+  el.retryBtn.style.display = 'none';
+  el.nextBtn.style.display = 'none';
+}
+
+function selectAnswer(key){
+  if(answered) return;
+  answered = true;
+  selectedKey = key;
+  const q = QUESTIONS[qIdx];
+  const isCorrect = key === q.type;
+  results[qIdx] = isCorrect ? 'correct' : 'wrong';
+
+  [...el.options.children].forEach(btn => {
+    btn.classList.add('locked');
+  });
+  const buttons = [...el.options.children];
+  const keys = Object.keys(TYPES);
+  buttons.forEach((btn, i) => {
+    const k = keys[i];
+    if(k === key) btn.classList.add('selected');
+    if(k === q.type){ btn.classList.add('correct'); btn.querySelector('.mark').textContent = '✓'; }
+    else if(k === key){ btn.classList.add('wrong'); btn.querySelector('.mark').textContent = '✗'; }
+    else btn.classList.add('dim');
+  });
+
+  el.resultBanner.className = 'result-banner show ' + (isCorrect ? 'correct' : 'wrong');
+  el.resultBanner.textContent = isCorrect ? 'Correct.' : `Not quite — this one is a ${TYPES[q.type].label}.`;
+
+  // reveal the flagged rows now
+  [...el.timeline.children].forEach(row => {
+    if(row.dataset && row.dataset.flag === '1') row.classList.add('flag');
+  });
+
+  el.revealName.textContent = TYPES[q.type].label;
+  el.revealExplain.innerHTML = q.explain + `<br><br><b>General pattern:</b> ${TYPES[q.type].short}`;
+  el.reveal.className = 'reveal show';
+
+  updateScore();
+
+  if(qIdx < QUESTIONS.length - 1){
+    el.nextBtn.style.display = 'inline-block';
+  } else {
+    el.nextBtn.textContent = 'See results';
+    el.nextBtn.style.display = 'inline-block';
+  }
+  renderDots();
+}
+
+function updateScore(){
+  const correctCount = results.filter(r => r === 'correct').length;
+  const answeredCount = results.filter(r => r !== undefined && r !== null).length;
+  el.scoreVal.textContent = correctCount;
+  el.scoreTotal.textContent = answeredCount;
+}
+
+function next(){
+  if(qIdx < QUESTIONS.length - 1){
+    qIdx++;
+    renderQuestion();
+  } else {
+    showDone();
+  }
+}
+
+function showDone(){
+  document.querySelectorAll('.timeline-panel, .prompt, .options, .result-banner, .reveal, .controls, .hud').forEach(elx => elx.style.display = 'none');
+  const correctCount = results.filter(r => r === 'correct').length;
+  el.doneScreen.style.display = 'block';
+  el.doneScreen.innerHTML = `
+    <h2>Quiz complete</h2>
+    <div class="bigscore">${correctCount} / ${QUESTIONS.length}</div>
+    <p style="color:var(--muted);font-size:13.5px;">Correct identifications across dirty reads, lost updates, and unrepeatable reads.</p>
+    <button class="btn primary" id="restartBtn" style="margin-top:14px;">Restart quiz</button>
+  `;
+  document.getElementById('restartBtn').onclick = restart;
+}
+
+function restart(){
+  qIdx = 0;
+  results = [];
+  document.querySelectorAll('.timeline-panel, .prompt, .options, .result-banner, .reveal, .controls, .hud').forEach(elx => elx.style.display = '');
+  el.doneScreen.style.display = 'none';
+  el.nextBtn.textContent = 'Next schedule →';
+  renderQuestion();
+  updateScore();
+}
+
+el.nextBtn.onclick = next;
+
+renderQuestion();
+updateScore();
+</script>
+</body>
+</html>
