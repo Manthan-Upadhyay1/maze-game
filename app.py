@@ -17,6 +17,15 @@ from ai import AIAgent
 from astart import AStar
 from greedy import Greedy
 from bidirectional import BidirectionalSearch
+from visualization import (
+    compare_algorithms,
+    show_table,
+    plot_path,
+    plot_nodes,
+    plot_time,
+    plot_pie,
+    show_best,
+)
 import inspect
 
 #st.write(inspect.getfile(MazeDrawer))
@@ -412,91 +421,95 @@ else:
             )
         )
 
+        if st.button("Compare All Algorithms"):
+            comparison_df = compare_algorithms(st.session_state["maze"])
+            if not comparison_df.empty:
+                show_table(comparison_df)
+                plot_path(comparison_df)
+                plot_nodes(comparison_df)
+                plot_time(comparison_df)
+                plot_pie(comparison_df)
+                show_best(comparison_df)
+
         if st.button("Run Algorithm"):
 
-    # -----------------------------
-    # Select Algorithm
-    # -----------------------------
+            # -----------------------------
+            # Select Algorithm
+            # -----------------------------
 
-         if algorithm == "Breadth First Search (BFS)":
-            solver = BFS(st.session_state["maze"])
+            if algorithm == "Breadth First Search (BFS)":
+                solver = BFS(st.session_state["maze"])
 
-        elif algorithm == "Depth First Search (DFS)":
-            solver = DFS(st.session_state["maze"])
+            elif algorithm == "Depth First Search (DFS)":
+                solver = DFS(st.session_state["maze"])
 
-        elif algorithm == "Uniform Cost Search (UCS)":
-            solver = UCS(st.session_state["maze"])
+            elif algorithm == "Uniform Cost Search (UCS)":
+                solver = UCS(st.session_state["maze"])
 
-        elif algorithm == "Greedy Best First Search":
+            elif algorithm == "Greedy Best First Search":
+                solver = Greedy(st.session_state["maze"])
 
-            solver = Greedy(st.session_state["maze"])
+            elif algorithm == "A* Search":
+                solver = AStar(st.session_state["maze"])
 
-        elif algorithm == "A* Search":
+            elif algorithm == "Bidirectional Search":
+                solver = BidirectionalSearch(st.session_state["maze"])
 
-            solver = AStar(st.session_state["maze"])
-        
-        elif algorithm == "Bidirectional Search":
+            else:
+                st.warning("Algorithm not implemented yet.")
+                st.stop()
 
-            solver = BidirectionalSearch(
-        st.session_state["maze"]
-    )
+            # -----------------------------
+            # Solve Maze
+            # -----------------------------
 
-        else:
-            st.warning("Algorithm not implemented yet.")
-            st.stop()
+            path, explored = solver.solve()
 
-    # -----------------------------
-    # Solve Maze
-    # -----------------------------
+            # -----------------------------
+            # Animation Placeholder
+            # -----------------------------
 
-        path, explored = solver.solve()
+            placeholder = st.empty()
 
-    # -----------------------------
-    # Animation Placeholder
-    # -----------------------------
+            # -----------------------------
+            # Animate Search
+            # -----------------------------
 
-        placeholder = st.empty()
+            for i in range(len(explored)):
 
-    # -----------------------------
-    # Animate Search
-    # -----------------------------
+                drawer = get_drawer_class(st.session_state["maze"])(
+                    st.session_state["maze"],
+                    cell_size=cell_size,
+                    explored=explored[:i+1],
+                )
 
-        for i in range(len(explored)):
-            
+                placeholder.image(
+                    drawer.draw(),
+                    channels="BGR",
+                    width="content",
+                )
+
+                time.sleep(0.03)
+
+            # -----------------------------
+            # Draw Final Path
+            # -----------------------------
 
             drawer = get_drawer_class(st.session_state["maze"])(
-            st.session_state["maze"],
-            cell_size=cell_size,
-            explored=explored[:i+1]
+                st.session_state["maze"],
+                cell_size=cell_size,
+                path=path,
             )
 
             placeholder.image(
-            drawer.draw(),
-            channels="BGR",
-            width="content"
+                drawer.draw(),
+                channels="BGR",
+                width="content",
             )
 
-            time.sleep(0.03)
+            st.success("Maze Solved!")
 
-    # -----------------------------
-    # Draw Final Path
-    # -----------------------------
+            c1, c2 = st.columns(2)
 
-        drawer = get_drawer_class(st.session_state["maze"])(
-        st.session_state["maze"],
-        cell_size=cell_size,
-        path=path
-        )
-
-        placeholder.image(
-        drawer.draw(),
-        channels="BGR",
-        width="content"
-        )
-
-        st.success("Maze Solved!")
-
-        c1, c2 = st.columns(2)
-
-        c1.metric("Path Length", len(path))
-        c2.metric("Nodes Explored", len(explored))
+            c1.metric("Path Length", len(path))
+            c2.metric("Nodes Explored", len(explored))
