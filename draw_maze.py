@@ -265,8 +265,11 @@ class TriangleMazeDrawer:
             centroid, edges = self._cell_geometry(r, k)
             centroids[(r, k)] = centroid
 
-            for wall_name, present in cell.items():
-                if present:
+            # Triangle cells only have these three wall names.
+            # Restricting the loop prevents unrelated keys such as
+            # "top" or "bottom" from causing KeyError.
+            for wall_name in ("left", "right", "vert"):
+                if cell.get(wall_name, False):
                     (x1, y1), (x2, y2) = edges[wall_name]
                     cv2.line(image, (x1, y1), (x2, y2), (0, 0, 0), 2)
 
@@ -278,6 +281,14 @@ class TriangleMazeDrawer:
 
         sx, sy = centroids[start]
         gx, gy = centroids[goal]
+
+        # cv2.rectangle(
+        #  image,
+        #  (sx, sy),
+        #  (self.cell_size // 4),
+        #  (0, 255, 0),
+        #  -1
+        # )
 
         cv2.circle(image, (sx, sy), self.cell_size // 4, (0, 255, 0), -1)
         cv2.circle(image, (gx, gy), self.cell_size // 4, (0, 0, 255), -1)
@@ -372,6 +383,276 @@ class HexMazeDrawer:
             cv2.circle(image, centers[self.player.get_position()], marker_radius, (255, 0, 0), -1)
         return image
 
+
+# class HexMazeDrawer:
+#     """Draw a pointy-top hexagonal maze stored in axial-offset rows/columns."""
+
+#     WALL_EDGES = {
+#         "top_left": (0, 5), "top_right": (0, 1), "right": (1, 2),
+#         "bottom_right": (2, 3), "bottom_left": (3, 4), "left": (4, 5),
+#     }
+
+#     def __init__(self, maze, cell_size=24, player=None, path=None, explored=None):
+#         self.maze = maze
+#         self.cell_size = cell_size
+#         self.player = player
+#         self.path = path
+#         self.explored = explored
+#         self.rows = max(row for row, _ in maze) + 1
+#         self.cols = max(col for _, col in maze) + 1
+#         self.radius = cell_size
+#         self.margin = cell_size + 4
+#         self.width = int(math.sqrt(3) * self.radius * (self.cols + (self.rows - 1) / 2) + 2 * self.margin)
+#         self.height = int(self.radius * (1.5 * (self.rows - 1) + 2) + 2 * self.margin)
+
+#     def _center(self, row, col):
+#         return (
+#             int(round(self.margin + math.sqrt(3) * self.radius * (col + row / 2))),
+#             int(round(self.margin + self.radius + 1.5 * self.radius * row)),
+#         )
+
+#     def _points(self, row, col):
+#         cx, cy = self._center(row, col)
+#         return [
+#             (int(round(cx + self.radius * math.cos(math.radians(angle)))),
+#              int(round(cy + self.radius * math.sin(math.radians(angle)))))
+#             for angle in (-90, -30, 30, 90, 150, 210)
+#         ]
+
+#     def draw(self):
+#         image = np.ones((self.height + 1, self.width + 1, 3), dtype=np.uint8) * 255
+#         centers = {}
+#         for cell_id, cell in self.maze.items():
+#             row, col = cell_id
+#             points = self._points(row, col)
+#             centers[cell_id] = self._center(row, col)
+#             for wall, (first, second) in self.WALL_EDGES.items():
+#                 if cell[wall]:
+#                     cv2.line(image, points[first], points[second], (0, 0, 0), 2)
+
+#         start, goal = start_goal(self.maze)
+#         marker_radius = max(3, self.radius // 3)
+#         cv2.circle(image, centers[start], marker_radius, (0, 255, 0), -1)
+#         cv2.circle(image, centers[goal], marker_radius, (0, 0, 255), -1)
+
+#         if self.explored is not None:
+#             for cell_id in self.explored:
+#                 cv2.circle(image, centers[cell_id], max(2, self.radius // 6), (255, 150, 0), -1)
+#         if self.path is not None:
+#             for cell_id in self.path:
+#                 cv2.circle(image, centers[cell_id], max(2, self.radius // 5), (255, 0, 255), -1)
+#         if self.player is not None:
+#             cv2.circle(image, centers[self.player.get_position()], marker_radius, (255, 0, 0), -1)
+#         return image
+
+
+
+# class HexBoundaryMazeDrawer:
+    # """
+    # Draws a rectangular-cell maze inside a hexagonal boundary.
+    # Internal passages use horizontal/vertical walls.
+    # """
+
+    # def __init__(
+    #     self,
+    #     maze,
+    #     cell_size=20,
+    #     player=None,
+    #     path=None,
+    #     explored=None
+    # ):
+    #     self.maze = maze
+    #     self.cell_size = cell_size
+    #     self.player = player
+    #     self.path = path
+    #     self.explored = explored
+
+    #     self.rows = max(r for r, c in maze) + 1
+    #     self.cols = max(c for r, c in maze) + 1
+
+    #     self.margin = 20
+
+    #     self.width = self.cols * cell_size + self.margin * 2
+    #     self.height = self.rows * cell_size + self.margin * 2
+
+    # def _valid_cell(self, row, col):
+
+    #     rows = self.rows
+    #     cols = self.cols
+
+    #     center_y = (rows - 1) / 2
+
+    #     # Distance from vertical center
+    #     distance = abs(row - center_y)
+
+    #     # Number of cells removed from left/right
+    #     cut = int(
+    #         distance * (cols * 0.25) / max(center_y, 1)
+    #     )
+
+    #     return cut <= col < cols - cut
+
+    # def _rect(self, row, col):
+
+    #     x1 = self.margin + col * self.cell_size
+    #     y1 = self.margin + row * self.cell_size
+
+    #     x2 = x1 + self.cell_size
+    #     y2 = y1 + self.cell_size
+
+    #     return x1, y1, x2, y2
+
+    # def _center(self, row, col):
+
+    #     x1, y1, x2, y2 = self._rect(row, col)
+
+    #     return (
+    #         (x1 + x2) // 2,
+    #         (y1 + y2) // 2
+    #     )
+
+    # def draw(self):
+
+    #     image = np.ones(
+    #         (self.height, self.width, 3),
+    #         dtype=np.uint8
+    #     ) * 255
+
+    #     centers = {}
+
+    #     # -------------------------
+    #     # DRAW MAZE WALLS
+    #     # -------------------------
+
+    #     for cell_id, cell in self.maze.items():
+
+    #         row, col = cell_id
+
+    #         if not self._valid_cell(row, col):
+    #             continue
+
+    #         x1, y1, x2, y2 = self._rect(row, col)
+
+    #         centers[cell_id] = self._center(row, col)
+
+    #         if cell.get("top", False):
+    #             cv2.line(
+    #                 image,
+    #                 (x1, y1),
+    #                 (x2, y1),
+    #                 (0, 0, 0),
+    #                 2
+    #             )
+
+    #         if cell.get("right", False):
+    #             cv2.line(
+    #                 image,
+    #                 (x2, y1),
+    #                 (x2, y2),
+    #                 (0, 0, 0),
+    #                 2
+    #             )
+
+    #         if cell.get("bottom", False):
+    #             cv2.line(
+    #                 image,
+    #                 (x1, y2),
+    #                 (x2, y2),
+    #                 (0, 0, 0),
+    #                 2
+    #             )
+
+    #         if cell.get("left", False):
+    #             cv2.line(
+    #                 image,
+    #                 (x1, y1),
+    #                 (x1, y2),
+    #                 (0, 0, 0),
+    #                 2
+    #             )
+
+    #     # -------------------------
+    #     # START / GOAL
+    #     # -------------------------
+
+    #     start, goal = start_goal(self.maze)
+
+    #     marker_radius = max(3, self.cell_size // 3)
+
+    #     if start in centers:
+    #         cv2.circle(
+    #             image,
+    #             centers[start],
+    #             marker_radius,
+    #             (0, 255, 0),
+    #             -1
+    #         )
+
+    #     if goal in centers:
+    #         cv2.circle(
+    #             image,
+    #             centers[goal],
+    #             marker_radius,
+    #             (0, 0, 255),
+    #             -1
+    #         )
+
+    #     # -------------------------
+    #     # EXPLORED
+    #     # -------------------------
+
+    #     if self.explored is not None:
+
+    #         for cell_id in self.explored:
+
+    #             if cell_id in centers:
+
+    #                 cv2.circle(
+    #                     image,
+    #                     centers[cell_id],
+    #                     max(2, self.cell_size // 6),
+    #                     (255, 150, 0),
+    #                     -1
+    #                 )
+
+    #     # -------------------------
+    #     # SOLUTION PATH
+    #     # -------------------------
+
+    #     if self.path is not None:
+
+    #         for cell_id in self.path:
+
+    #             if cell_id in centers:
+
+    #                 cv2.circle(
+    #                     image,
+    #                     centers[cell_id],
+    #                     max(2, self.cell_size // 5),
+    #                     (255, 0, 255),
+    #                     -1
+    #                 )
+
+    #     # -------------------------
+    #     # PLAYER
+    #     # -------------------------
+
+    #     if self.player is not None:
+
+    #         pos = self.player.get_position()
+
+    #         if pos in centers:
+
+    #             cv2.circle(
+    #                 image,
+    #                 centers[pos],
+    #                 marker_radius,
+    #                 (255, 0, 0),
+    #                 -1
+    #             )
+
+    #     return image
+
 class CircleMazeDrawer:
     """Draw a maze made of concentric circular rings."""
 
@@ -414,4 +695,506 @@ class CircleMazeDrawer:
         cv2.circle(image, self._center(*start), marker, (0, 255, 0), -1)
         cv2.circle(image, self._center(*goal), marker, (0, 0, 255), -1)
         if self.player: cv2.circle(image, self._center(*self.player.get_position()), marker, (255, 0, 0), -1)
+        return image
+
+
+# class HexBoundaryMazeDrawer:
+#     """
+#     Draws a rectangular-cell maze arranged in
+#     a hexagonal overall shape.
+#     """
+
+#     def __init__(
+#         self,
+#         maze,
+#         cell_size=20,
+#         player=None,
+#         path=None,
+#         explored=None
+#     ):
+#         self.maze = maze
+#         self.cell_size = cell_size
+#         self.player = player
+#         self.path = path
+#         self.explored = explored
+
+#         self.margin = 20
+
+#         if not maze:
+#             self.rows = 0
+#             self.cols = 0
+#         else:
+#             self.rows = max(
+#                 row for row, col in maze
+#             ) + 1
+
+#             self.cols = max(
+#                 col for row, col in maze
+#             ) + 1
+
+#         self.width = (
+#             self.cols * self.cell_size
+#             + self.margin * 2
+#         )
+
+#         self.height = (
+#             self.rows * self.cell_size
+#             + self.margin * 2
+#         )
+
+#     def _rect(self, row, col):
+
+#         x1 = self.margin + col * self.cell_size
+#         y1 = self.margin + row * self.cell_size
+
+#         x2 = x1 + self.cell_size
+#         y2 = y1 + self.cell_size
+
+#         return x1, y1, x2, y2
+
+#     def _center(self, row, col):
+
+#         x1, y1, x2, y2 = self._rect(
+#             row,
+#             col
+#         )
+
+#         return (
+#             (x1 + x2) // 2,
+#             (y1 + y2) // 2
+#         )
+
+#     def draw(self):
+
+#         # White background
+#         image = np.ones(
+#             (
+#                 self.height + 1,
+#                 self.width + 1,
+#                 3
+#             ),
+#             dtype=np.uint8
+#         ) * 255
+
+#         centers = {}
+
+#         # =====================================
+#         # DRAW MAZE
+#         # =====================================
+
+#         for cell_id, cell in self.maze.items():
+
+#             row, col = cell_id
+
+#             x1, y1, x2, y2 = self._rect(
+#                 row,
+#                 col
+#             )
+
+#             centers[cell_id] = self._center(
+#                 row,
+#                 col
+#             )
+
+#             # TOP WALL
+#             if cell.get("top", False):
+
+#                 cv2.line(
+#                     image,
+#                     (x1, y1),
+#                     (x2, y1),
+#                     (0, 0, 0),
+#                     2
+#                 )
+
+#             # RIGHT WALL
+#             if cell.get("right", False):
+
+#                 cv2.line(
+#                     image,
+#                     (x2, y1),
+#                     (x2, y2),
+#                     (0, 0, 0),
+#                     2
+#                 )
+
+#             # BOTTOM WALL
+#             if cell.get("bottom", False):
+
+#                 cv2.line(
+#                     image,
+#                     (x1, y2),
+#                     (x2, y2),
+#                     (0, 0, 0),
+#                     2
+#                 )
+
+#             # LEFT WALL
+#             if cell.get("left", False):
+
+#                 cv2.line(
+#                     image,
+#                     (x1, y1),
+#                     (x1, y2),
+#                     (0, 0, 0),
+#                     2
+#                 )
+
+#             # =====================================
+#             # START / GOAL
+#             # =====================================
+
+#             start, goal = start_goal(self.maze)
+
+#             marker_radius = max(
+#                 3,
+#                 self.cell_size // 3
+#             )
+
+#             # Green start
+#             if start in centers:
+#                 cv2.circle(
+#                     image,
+#                     centers[start],
+#                     marker_radius,
+#                     (0, 255, 0),
+#                     -1
+#                 )
+
+#             # Red goal
+#             if goal in centers:
+#                 cv2.circle(
+#                     image,
+#                     centers[goal],
+#                     marker_radius,
+#                     (0, 0, 255),
+#                     -1
+#                 )
+
+
+#             # =====================================
+#             # EXPLORED
+#             # =====================================
+
+#             if self.explored is not None:
+#                 for cell_id in self.explored:
+#                     if cell_id in centers:
+#                         cv2.circle(
+#                             image,
+#                             centers[cell_id],
+#                             max(2, self.cell_size // 6),
+#                             (255, 150, 0),
+#                             -1
+#                         )
+
+
+#             # =====================================
+#             # SOLUTION PATH
+#             # =====================================
+
+#             if self.path is not None:
+
+#                 valid_path = [
+#                     cell
+#                     for cell in self.path
+#                     if cell in centers
+#                 ]
+
+#                 for i in range(len(valid_path) - 1):
+#                     cv2.line(
+#                         image,
+#                         centers[valid_path[i]],
+#                         centers[valid_path[i + 1]],
+#                         (255, 0, 255),
+#                         max(2, self.cell_size // 5)
+#                     )
+
+
+#             # =====================================
+#             # PLAYER
+#             # =====================================
+
+#             if self.player is not None:
+
+#                 player_position = self.player.get_position()
+
+#                 if player_position in centers:
+
+#                     cv2.circle(
+#                         image,
+#                         centers[player_position],
+#                         marker_radius,
+#                         (255, 0, 0),
+#                         -1
+#                     )
+
+
+#             return image
+
+
+class HexBoundaryMazeDrawer:
+    """
+    Draw rectangular maze cells arranged inside
+    an overall hexagonal boundary.
+    """
+
+    def __init__(
+        self,
+        maze,
+        cell_size=20,
+        player=None,
+        path=None,
+        explored=None
+    ):
+        self.maze = maze
+        self.cell_size = cell_size
+        self.player = player
+        self.path = path
+        self.explored = explored
+
+        self.margin = 20
+
+        if maze:
+            self.rows = max(
+                r for r, _ in maze
+            ) + 1
+
+            self.cols = max(
+                c for _, c in maze
+            ) + 1
+        else:
+            self.rows = 0
+            self.cols = 0
+
+        self.width = (
+            self.cols * cell_size
+            + self.margin * 2
+        )
+
+        self.height = (
+            self.rows * cell_size
+            + self.margin * 2
+        )
+
+    # ==========================================
+    # CELL RECTANGLE
+    # ==========================================
+
+    def _rect(self, row, col):
+
+        x1 = (
+            self.margin
+            + col * self.cell_size
+        )
+
+        y1 = (
+            self.margin
+            + row * self.cell_size
+        )
+
+        x2 = x1 + self.cell_size
+        y2 = y1 + self.cell_size
+
+        return x1, y1, x2, y2
+
+    # ==========================================
+    # CELL CENTER
+    # ==========================================
+
+    def _center(self, row, col):
+
+        x1, y1, x2, y2 = self._rect(
+            row,
+            col
+        )
+
+        return (
+            (x1 + x2) // 2,
+            (y1 + y2) // 2
+        )
+
+    # ==========================================
+    # DRAW
+    # ==========================================
+
+    def draw(self):
+
+        image = np.ones(
+            (
+                self.height + 1,
+                self.width + 1,
+                3
+            ),
+            dtype=np.uint8
+        ) * 255
+
+        centers = {}
+
+        # ======================================
+        # DRAW ALL MAZE CELLS
+        # ======================================
+
+        for (row, col), cell in self.maze.items():
+
+            x1, y1, x2, y2 = self._rect(
+                row,
+                col
+            )
+
+            centers[(row, col)] = (
+                self._center(row, col)
+            )
+
+            # TOP
+            if cell.get("top", True):
+
+                cv2.line(
+                    image,
+                    (x1, y1),
+                    (x2, y1),
+                    (0, 0, 0),
+                    2
+                )
+
+            # RIGHT
+            if cell.get("right", True):
+
+                cv2.line(
+                    image,
+                    (x2, y1),
+                    (x2, y2),
+                    (0, 0, 0),
+                    2
+                )
+
+            # BOTTOM
+            if cell.get("bottom", True):
+
+                cv2.line(
+                    image,
+                    (x1, y2),
+                    (x2, y2),
+                    (0, 0, 0),
+                    2
+                )
+
+            # LEFT
+            if cell.get("left", True):
+
+                cv2.line(
+                    image,
+                    (x1, y1),
+                    (x1, y2),
+                    (0, 0, 0),
+                    2
+                )
+
+        # IMPORTANT:
+        # Everything below this point is OUTSIDE
+        # the for-loop.
+
+        # ======================================
+        # START / GOAL
+        # ======================================
+
+        start, goal = start_goal(
+            self.maze
+        )
+
+        marker_radius = max(
+            3,
+            self.cell_size // 4
+        )
+
+        # Green start
+        if start in centers:
+
+            cv2.circle(
+                image,
+                centers[start],
+                marker_radius,
+                (0, 255, 0),
+                -1
+            )
+
+        # Red goal
+        if goal in centers:
+
+            cv2.circle(
+                image,
+                centers[goal],
+                marker_radius,
+                (0, 0, 255),
+                -1
+            )
+
+        # ======================================
+        # EXPLORED CELLS
+        # ======================================
+
+        if self.explored is not None:
+
+            for cell in self.explored:
+
+                if cell in centers:
+
+                    cv2.circle(
+                        image,
+                        centers[cell],
+                        max(
+                            2,
+                            self.cell_size // 8
+                        ),
+                        (255, 150, 0),
+                        -1
+                    )
+
+        # ======================================
+        # SOLUTION PATH
+        # ======================================
+
+        if self.path is not None:
+
+            for cell in self.path:
+
+                if cell in centers:
+
+                    cv2.circle(
+                        image,
+                        centers[cell],
+                        max(
+                            2,
+                            self.cell_size // 6
+                        ),
+                        (255, 0, 255),
+                        -1
+                    )
+
+        # ======================================
+        # PLAYER
+        # ======================================
+
+        # Player is intentionally drawn LAST.
+        # Therefore blue covers green at start,
+        # exactly like MazeDrawer.
+
+        if self.player is not None:
+
+            position = (
+                self.player.get_position()
+            )
+
+            if position in centers:
+
+                cv2.circle(
+                    image,
+                    centers[position],
+                    marker_radius,
+                    (255, 0, 0),
+                    -1
+                )
+
+        # IMPORTANT:
+        # return is outside ALL loops.
+
         return image

@@ -1,12 +1,17 @@
 import streamlit as st
+# import player
+# st.write("PLAYER FILE:", player.__file__)
+
 #from maze.generator import MazeGenerator
 #from visualization.draw_maze import MazeDrawer
 #from game.player import Player
 from generator import MazeGenerator
 from triangle_generator import TriangleMazeGenerator
-from hex_generator import HexMazeGenerator
+# from hex_generator import HexMazeGenerator
+from hex_generator import HexBoundaryMazeGenerator
 from circle_generator import CircleMazeGenerator
-from draw_maze import MazeDrawer, TriangleMazeDrawer, HexMazeDrawer, CircleMazeDrawer
+# from draw_maze import MazeDrawer, TriangleMazeDrawer, HexMazeDrawer, CircleMazeDrawer
+from draw_maze import MazeDrawer, TriangleMazeDrawer, HexBoundaryMazeDrawer, CircleMazeDrawer
 from maze_utils import is_circle_maze, is_hex_maze, is_triangle_maze
 from player import Player
 from controler import GameController
@@ -60,20 +65,82 @@ st.sidebar.title("Maze Settings")
 
 maze_shape = st.sidebar.selectbox(
     "Maze Shape",
-    ("Square", "Triangle", "Hexagon", "Circle")
+    ("Square", "Triangle", "Hexagon", "Circle") #
 )
 
+# if maze_shape == "Square":
+#     maze_rows = st.sidebar.slider("Rows", min_value=5, max_value=30, value=15)
+#     maze_cols = st.sidebar.slider("Columns", min_value=5, max_value=30, value=15)
+# elif maze_shape == "Triangle":
+#     triangle_size = st.sidebar.slider("Size (rows)", min_value=4, max_value=25, value=12)
+# elif maze_shape == "Hexagon":
+#     hex_rows = st.sidebar.slider("Rows", min_value=4, max_value=20, value=10, key="hex_rows")
+#     hex_cols = st.sidebar.slider("Columns", min_value=4, max_value=20, value=10, key="hex_cols")
+# elif maze_shape == "Hexagon":
+#     hex_rows = st.sidebar.slider("Rows", min_value=4, max_value=20, value=10, key="hex_rows")
+#     hex_cols = st.sidebar.slider("Columns", min_value=4, max_value=20, value=10, key="hex_cols")
+# else:
+#     circle_rings = st.sidebar.slider("Rings", min_value=3, max_value=18, value=8)
+#     circle_sectors = st.sidebar.slider("Sectors", min_value=8, max_value=24, value=16)
+
 if maze_shape == "Square":
-    maze_rows = st.sidebar.slider("Rows", min_value=5, max_value=30, value=15)
-    maze_cols = st.sidebar.slider("Columns", min_value=5, max_value=30, value=15)
+    maze_rows = st.sidebar.slider(
+        "Rows",
+        min_value=5,
+        max_value=30,
+        value=15
+    )
+
+    maze_cols = st.sidebar.slider(
+        "Columns",
+        min_value=5,
+        max_value=30,
+        value=15
+    )
+
 elif maze_shape == "Triangle":
-    triangle_size = st.sidebar.slider("Size (rows)", min_value=4, max_value=25, value=12)
+    triangle_size = st.sidebar.slider(
+        "Size (rows)",
+        min_value=4,
+        max_value=25,
+        value=12
+    )
+
 elif maze_shape == "Hexagon":
-    hex_rows = st.sidebar.slider("Rows", min_value=4, max_value=20, value=10, key="hex_rows")
-    hex_cols = st.sidebar.slider("Columns", min_value=4, max_value=20, value=10, key="hex_cols")
-else:
-    circle_rings = st.sidebar.slider("Rings", min_value=3, max_value=18, value=8)
-    circle_sectors = st.sidebar.slider("Sectors", min_value=8, max_value=24, value=16)
+    # This is now the NEW reference-style hexagon maze
+    hex_rows = st.sidebar.slider(
+        "Rows",
+        min_value=7,
+        max_value=31,
+        value=17,
+        step=2,
+        key="hex_rows"
+    )
+
+    hex_cols = st.sidebar.slider(
+        "Columns",
+        min_value=9,
+        max_value=35,
+        value=21,
+        step=2,
+        key="hex_cols"
+    )
+
+elif maze_shape == "Circle":
+    circle_rings = st.sidebar.slider(
+        "Rings",
+        min_value=3,
+        max_value=18,
+        value=8
+    )
+
+    circle_sectors = st.sidebar.slider(
+        "Sectors",
+        min_value=8,
+        max_value=24,
+        value=16
+    )
+
 
 def build_maze():
     """Create a new maze matching the selected shape."""
@@ -81,8 +148,10 @@ def build_maze():
         return MazeGenerator(maze_rows, maze_cols).generate()
     if maze_shape == "Triangle":
         return TriangleMazeGenerator(triangle_size).generate()
+    # if maze_shape == "Hexagon":
+    #     return HexMazeGenerator(hex_rows, hex_cols).generate()
     if maze_shape == "Hexagon":
-        return HexMazeGenerator(hex_rows, hex_cols).generate()
+        return HexBoundaryMazeGenerator(hex_rows, hex_cols).generate()
     return CircleMazeGenerator(circle_rings, circle_sectors).generate()
 
 generate = st.sidebar.button("Generate New Maze")
@@ -153,32 +222,54 @@ st.markdown(
 )
 
 
-def get_drawer_class(maze):
-    if is_triangle_maze(maze):
+def get_drawer_class():
+    """Return the drawer for the shape selected in the sidebar."""
+    if maze_shape == "Square":
+        return MazeDrawer
+    elif maze_shape == "Triangle":
         return TriangleMazeDrawer
-    if is_hex_maze(maze):
-        return HexMazeDrawer
-    if is_circle_maze(maze):
+    elif maze_shape == "Hexagon":
+        return HexBoundaryMazeDrawer
+    elif maze_shape == "Circle":
         return CircleMazeDrawer
     return MazeDrawer
 
 
 def compute_cell_size(maze):
-    if is_triangle_maze(maze):
+    """Choose a display cell size for the currently selected maze shape."""
+    if maze_shape == "Triangle":
         size = max(row for row, _ in maze) + 1
         return max(12, min(28, 420 // max(1, size)))
-    if is_hex_maze(maze):
+
+    elif maze_shape == "Hexagon":
         rows = max(row for row, _ in maze) + 1
         cols = max(col for _, col in maze) + 1
-        return max(12, min(25, 360 // max(1, rows), 620 // max(1, cols)))
-    if is_circle_maze(maze):
+        return max(
+            12,
+            min(
+                25,
+                360 // max(1, rows),
+                620 // max(1, cols),
+            ),
+        )
+
+    elif maze_shape == "Circle":
         rings = max(row for row, _ in maze) + 1
         return max(12, min(24, 210 // max(1, rings)))
-    return max(12, min(28, 420 // max(len(maze), len(maze[0]))))
+
+    else:
+        return max(
+            12,
+            min(
+                28,
+                420 // max(len(maze), len(maze[0])),
+            ),
+        )
+
 
 if "maze" in st.session_state:
     cell_size = compute_cell_size(st.session_state["maze"])
-    drawer = get_drawer_class(st.session_state["maze"])(
+    drawer = get_drawer_class()(
     st.session_state["maze"],
     cell_size=cell_size,
     player=st.session_state["player"],
@@ -240,7 +331,7 @@ if mode == "🎮 Solve Manually":
     )
 
     if control_mode == "Keyboard (Arrow keys / WASD)":
-        st.sidebar.caption("Hex maze: W/A/S/D plus Q (northeast) and Z (southwest)." if is_hex_maze(st.session_state["maze"]) else "Keyboard mode is active. Arrow keys and WASD move the player.")
+        st.sidebar.caption("Keyboard mode is active. Arrow keys and WASD move the player.")
 
         # The component restores focus after each Streamlit rerun, so a key
         # press moves one cell without requiring another click.
@@ -249,7 +340,7 @@ if mode == "🎮 Solve Manually":
             direction = keyboard_input.get("direction")
             event_id = keyboard_input.get("event_id")
             if (
-                direction in {"UP", "DOWN", "LEFT", "RIGHT", "NE", "SW"}
+                direction in {"UP", "DOWN", "LEFT", "RIGHT"}
                 and event_id != st.session_state.get("last_keyboard_event")
             ):
                 st.session_state["last_keyboard_event"] = event_id
@@ -261,18 +352,7 @@ if mode == "🎮 Solve Manually":
             st.rerun()
 
     else:
-        st.sidebar.caption("Hex mazes also use ↗️ and ↙️ for their extra exits." if is_hex_maze(st.session_state["maze"]) else "Use the on-screen arrow buttons to move.")
-        if is_hex_maze(st.session_state["maze"]):
-            d1, d2 = st.sidebar.columns(2)
-            with d1:
-                if st.button("↗️", key="north_east"):
-                    controller.move("NE")
-                    st.rerun()
-            with d2:
-                if st.button("↙️", key="south_west"):
-                    controller.move("SW")
-                    st.rerun()
-
+        st.sidebar.caption("Use the on-screen arrow buttons to move.")
         c1, c2, c3 = st.sidebar.columns(3)
 
         with c2:
@@ -360,7 +440,7 @@ else:
         # Animate explored nodes
         for i in range(len(explored)):
 
-            drawer = get_drawer_class(st.session_state["maze"])(
+            drawer = get_drawer_class()(
                 st.session_state["maze"],
                 cell_size=cell_size,
                 explored=explored[:i+1]
@@ -375,7 +455,7 @@ else:
             time.sleep(0.03)
 
         # Draw final path
-        drawer = get_drawer_class(st.session_state["maze"])(
+        drawer = get_drawer_class()(
             st.session_state["maze"],
             cell_size=cell_size,
             path=path
@@ -477,7 +557,7 @@ else:
 
             for i in range(len(explored)):
 
-                drawer = get_drawer_class(st.session_state["maze"])(
+                drawer = get_drawer_class()(
                     st.session_state["maze"],
                     cell_size=cell_size,
                     explored=explored[:i+1],
@@ -495,7 +575,7 @@ else:
             # Draw Final Path
             # -----------------------------
 
-            drawer = get_drawer_class(st.session_state["maze"])(
+            drawer = get_drawer_class()(
                 st.session_state["maze"],
                 cell_size=cell_size,
                 path=path,
